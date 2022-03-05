@@ -1,70 +1,62 @@
-pipeline { 
-
-    environment { 
-
-        registry = "https://registry.hub.docker.com" 
-
-        registryCredential = 'docker_repo' 
-
-        dockerImage = 'myfirstexp' 
-
+pipeline {
+    agent any
+	
+	  tools
+    {
+       maven "Maven"
     }
-
-    agent any 
-
-    stages { 
-
-        stage('Cloning our Git') { 
-
-            steps { 
-
-                git 'https://github.com/suman7799/git-jenkins-docker.git' 
-
-            }
-
-        } 
-
-        stage('Building our image') { 
-
-            steps { 
-
-                script { 
-
-                    dockerImage = docker.build registry + ":$BUILD_NUMBER" 
-
-                }
-
-            } 
-
+ stages {
+      stage('checkout') {
+           steps {
+             
+                git branch: 'master', url: 'https://github.com/srikanta1219/CI-CD-using-Docker-master.git'
+             
+          }
         }
+	 stage('Execute Maven') {
+           steps {
+             
+                sh 'mvn package'             
+          }
+        }
+        
 
-        stage('Deploy our image') { 
-
-            steps { 
-
-                script { 
-
-                    docker.withRegistry( '', registryCredential ) { 
-
-                        dockerImage.push() 
-
-                    }
-
-                } 
-
+  stage('Docker Build and Tag') {
+           steps {
+              
+                sh 'docker build -t samplewebapp:latest .' 
+                sh 'docker tag samplewebapp srikanta/samplewebapp:latest'
+                //sh 'docker tag samplewebapp srikanta/samplewebapp:$BUILD_NUMBER'
+               
+          }
+        }
+     
+  stage('Publish image to Docker Hub') {
+          
+            steps {
+        withDockerRegistry([ credentialsId: "dockerHub", url: "" ]) {
+          sh  'docker push srikanta/samplewebapp:latest'
+        //  sh  'docker push srikanta/samplewebapp:$BUILD_NUMBER' 
+        }
+                  
+          }
+        }
+     
+      stage('Run Docker container on Jenkins Agent') {
+             
+            steps 
+			{
+                sh "docker run -d -p 8003:8080 srikanta/samplewebapp"
+ 
             }
-
-        } 
-
-        stage('Cleaning up') { 
-
-            steps { 
-
-                sh "docker rmi $registry:$BUILD_NUMBER" 
-
+        }
+ stage('Run Docker container on remote hosts') {
+             
+            steps {
+                sh "docker -H ssh://jenkins@172.31.28.25 run -d -p 8003:8080 srikanta/samplewebapp"
+ 
             }
-
-        } 
-
+        }
     }
-}
+	}
+    
